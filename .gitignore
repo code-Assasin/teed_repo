@@ -1,0 +1,9 @@
+# add wandb foler to ignore
+wandb/*
+/home/machiraj/teed/wandb/*
+*.pyc
+*.lst
+wandb/run-20231108_122902-yuxryf6p/run-yuxryf6p.wandb
+wandb/run-20231108_122902-yuxryf6p/files/output.log
+wandb/run-20231108_122902-yuxryf6p/files/wandb-summary.json
+wandb/run-20231108_122902-yuxryf6p/logs/debug-internal.log
