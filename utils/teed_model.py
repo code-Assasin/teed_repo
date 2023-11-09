@@ -13,7 +13,6 @@ sys.path.append("../")
 
 from utils.AF.Fsmish import smish as Fsmish
 from utils.AF.Xsmish import Smish
-from utils.img_processing import count_parameters
 
 
 def weight_init(m):
@@ -30,57 +29,18 @@ def weight_init(m):
             torch.nn.init.zeros_(m.bias)
 
 
-class CoFusion(nn.Module):
-    # from LDC
-
-    def __init__(self, in_ch, out_ch):
-        super(CoFusion, self).__init__()
-        self.conv1 = nn.Conv2d(
-            in_ch, 32, kernel_size=3, stride=1, padding=1
-        )  # before 64
-        self.conv3 = nn.Conv2d(
-            32, out_ch, kernel_size=3, stride=1, padding=1
-        )  # before 64  instead of 32
-        self.relu = nn.ReLU()
-        self.norm_layer1 = nn.GroupNorm(4, 32)  # before 64
-
-    def forward(self, x):
-        # fusecat = torch.cat(x, dim=1)
-        attn = self.relu(self.norm_layer1(self.conv1(x)))
-        attn = F.softmax(self.conv3(attn), dim=1)
-        return ((x * attn).sum(1)).unsqueeze(1)
-
-
-class CoFusion2(nn.Module):
-    # TEDv14-3
-    def __init__(self, in_ch, out_ch):
-        super(CoFusion2, self).__init__()
-        self.conv1 = nn.Conv2d(
-            in_ch, 32, kernel_size=3, stride=1, padding=1
-        )  # before 64
-        # self.conv2 = nn.Conv2d(32, 32, kernel_size=3,
-        #                        stride=1, padding=1)# before 64
-        self.conv3 = nn.Conv2d(
-            32, out_ch, kernel_size=3, stride=1, padding=1
-        )  # before 64  instead of 32
-        self.smish = Smish()  # nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        # fusecat = torch.cat(x, dim=1)
-        attn = self.conv1(self.smish(x))
-        attn = self.conv3(self.smish(attn))  # before , )dim=1)
-
-        # return ((fusecat * attn).sum(1)).unsqueeze(1)
-        return ((x * attn).sum(1)).unsqueeze(1)
-
-
 class DoubleFusion(nn.Module):
     # TED fusion before the final edge map prediction
     def __init__(self, in_ch, out_ch):
         super(DoubleFusion, self).__init__()
         out_ch = 3  # in_ch = 3, same as original paper
         self.DWconv1 = nn.Conv2d(
-            in_ch, out_channels=out_ch, kernel_size=3, stride=1, padding=1, groups=in_ch
+            in_ch,
+            out_channels=out_ch,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            groups=out_ch,
         )  # before 64
         self.PSconv1 = nn.PixelShuffle(1)
 
@@ -100,9 +60,9 @@ class DoubleFusion(nn.Module):
         attn = self.PSconv1(self.DWconv1(self.AF(x)))
         attn2 = self.PSconv1(self.DWconv2(self.AF(attn)))
         # print(attn2.shape, attn.shape)
-        res = Fsmish(attn2 + attn)
+        # res = Fsmish(attn2 + attn)
         # print('res', res.shape)
-        return res
+        return attn2
 
 
 class _DenseLayer(nn.Sequential):
@@ -199,6 +159,16 @@ class SingleConvBlock(nn.Module):
             return x
 
 
+class HEDFusionBlock(nn.Module):
+    def __init__(self, in_features, out_features, stride=1, use_ac=False):
+        super(HEDFusionBlock, self).__init__()
+        self.conv = nn.Conv2d(in_features, out_features, 1, stride=stride, bias=True)
+
+    def forward(self, x):
+        x = self.conv(x)
+        return x
+
+
 class DoubleConvBlock(nn.Module):
     def __init__(
         self, in_features, mid_features, out_features=None, stride=1, use_act=True
@@ -245,7 +215,8 @@ class TEED(nn.Module):
         self.up_block_2 = UpConvBlock(in_features=32, up_scale=1, output_channels=3)
         self.up_block_3 = UpConvBlock(in_features=48, up_scale=2, output_channels=3)
 
-        self.block_cat = DoubleFusion(3, 3)  # TEED: DoubleFusion
+        self.block_cat = DoubleFusion(9, 3)  # TEED: DoubleFusion
+        # self.block_cat = HEDFusionBlock(in_features=9, out_features=3)
 
         self.apply(weight_init)
 
@@ -305,9 +276,9 @@ class TEED(nn.Module):
         results = [out_1, out_2, out_3]
 
         # concatenate multiscale outputs
-        block_cat = (out_1 + out_2 + out_3) / 3.0  # Bx3xHxW
+        block_cat = torch.cat([out_1, out_2, out_3], dim=1)  # Bx9xHxW
         # print('concat shape', block_cat.shape)
-        block_cat = self.block_cat(block_cat)  # Bx1xHxW DoubleFusion
+        block_cat = self.block_cat(block_cat)  # Bx3xHxW HEDFusionBlock
 
         results.append(block_cat)
         return results

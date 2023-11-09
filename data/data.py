@@ -28,7 +28,9 @@ class DataLoading:
     def __init__(self, params):
         self.dataset_name = params["dataset"]
         self.batch_size = params["batch_size"]
-        self.shuffle = True  # to keep consistency
+        self.train_shuffle = True  # to keep consistency
+        self.test_shuffle = False  # to keep consistency
+        self.num_workers = params["num_workers"]
 
     def get_data(self):
         if self.dataset_name == "cifar10":
@@ -43,11 +45,7 @@ class DataLoading:
     def cifar10_loading(self):
         root_path = configs.dataset_paths["cifar10"]
         transform_test = transforms.Compose([transforms.ToTensor(),])
-        transform_train = transforms.Compose(
-            [
-                transforms.ToTensor(),
-            ]
-        )
+        transform_train = transforms.Compose([transforms.ToTensor(),])
 
         testset = torchvision.datasets.CIFAR10(
             root=root_path, train=False, download=True, transform=transform_test,
@@ -58,11 +56,17 @@ class DataLoading:
         )
 
         testloader = torch.utils.data.DataLoader(
-            testset, batch_size=self.batch_size, shuffle=self.shuffle, num_workers=2
+            testset,
+            batch_size=self.batch_size,
+            shuffle=self.test_shuffle,
+            num_workers=self.num_workers,
         )
 
         trainloader = torch.utils.data.DataLoader(
-            trainset, batch_size=self.batch_size, shuffle=self.shuffle, num_workers=2
+            trainset,
+            batch_size=self.batch_size,
+            shuffle=self.train_shuffle,
+            num_workers=self.num_workers,
         )
 
         print("Loading data from {}".format(self.dataset_name.upper()))
@@ -72,11 +76,7 @@ class DataLoading:
     def cifar100_loading(self):
         root_path = configs.dataset_paths["cifar100"]
         transform_test = transforms.Compose([transforms.ToTensor(),])
-        transform_train = transforms.Compose(
-            [
-                transforms.ToTensor(),
-            ]
-        )
+        transform_train = transforms.Compose([transforms.ToTensor(),])
 
         testset = torchvision.datasets.CIFAR100(
             root=root_path, train=False, download=True, transform=transform_test,
@@ -87,11 +87,17 @@ class DataLoading:
         )
 
         testloader = torch.utils.data.DataLoader(
-            testset, batch_size=self.batch_size, shuffle=self.shuffle, num_workers=2
+            testset,
+            batch_size=self.batch_size,
+            shuffle=self.test_shuffle,
+            num_workers=self.num_workers,
         )
 
         trainloader = torch.utils.data.DataLoader(
-            trainset, batch_size=self.batch_size, shuffle=self.shuffle, num_workers=2
+            trainset,
+            batch_size=self.batch_size,
+            shuffle=self.train_shuffle,
+            num_workers=self.num_workers,
         )
 
         print("Loading data from {}".format(self.dataset_name.upper()))
@@ -103,11 +109,7 @@ class DataLoading:
         test_transform = transforms.Compose(
             [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),]
         )
-        train_transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-            ]
-        )
+        train_transform = transforms.Compose([transforms.ToTensor(),])
         imagenet_path_val = configs.dataset_paths["imagenet_val"]
         imagenet_path = configs.dataset_paths["imagenet_train"]
 
@@ -119,7 +121,7 @@ class DataLoading:
             batch_size=self.batch_size,
             shuffle=self.shuffle,
             pin_memory=True,
-            num_workers=8,
+            num_workers=self.num_workers,
         )
 
         trainloader = torch.utils.data.DataLoader(
@@ -127,7 +129,7 @@ class DataLoading:
             batch_size=self.batch_size,
             shuffle=self.shuffle,
             pin_memory=True,
-            num_workers=8,
+            num_workers=self.num_workers,
         )
         print("Loading data from {}".format(self.dataset_name.upper()))
         return trainset, trainloader, testset, testloader

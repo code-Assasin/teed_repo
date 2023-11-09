@@ -5,6 +5,7 @@ import sys
 sys.path.append("../")
 import data
 from teed_trainer import TEEDTrainer
+from utils.misc import *
 import configs
 
 # argparse to get params
@@ -13,29 +14,34 @@ parser.add_argument("--epochs", type=int, default=100)
 parser.add_argument("--lr", type=float, default=1e-4)
 parser.add_argument("--weight_decay", type=float, default=1e-4)
 parser.add_argument("--noise_std", type=float, default=0.1)
-parser.add_argument("--load_checkpoint", type=bool, default=False)
-# parser.add_argument("--checkpoint_path", type=str, default="")
 parser.add_argument("--batch_size", type=int, default=32)
-parser.add_argument("--num_workers", type=int, default=4)
+parser.add_argument("--num_workers", type=int, default=8)
 parser.add_argument("--dataset", type=str, default="cifar10")
+parser.add_argument("--run_name", type=str, default=None)
+parser.add_argument("--scheduler", choices=["cosine", "multistep", "onecycle", "constant"], default="multistep")
 
 # convert to params
 params = parser.parse_args()
 params = vars(params)
 
 config_wandb = dict(defense=params)
-run_name = 'trial'
-# save_name = save_name_generator(param)
-# param["save_name"] = save_name
-params["checkpoint_path"] = configs.directory_names["save_dir"]
+
+if params["run_name"] is None:
+    print("run_name is None")
+    run_name = run_name_generator(params)
+    params["run_name"] = run_name
+
+params["checkpoint_path"] = save_path_generator(
+    params, save_dir=configs.directory_names["save_dir"]
+)
 
 logger = wandb.init(
     entity=configs.wandb_config["entity"],
     project=configs.wandb_config["project"],
     reinit=configs.wandb_config["reinit"],
-    name=run_name,
+    name=params["run_name"],
     config=config_wandb,
-)
+) # settings is to prevent wandb from streaming file chunk errors
 params["logger"] = logger
 
 # get dataset
@@ -48,5 +54,3 @@ params["testloader"] = testloader
 # Train model
 trainer = TEEDTrainer(params=params, device="cuda")
 trainer.solve()
-
-

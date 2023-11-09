@@ -7,18 +7,46 @@ from utils.AF.Fsmish import smish as Fsmish
 
 
 class TEEDLoss:
-    def __init__(self, loss_type='bdcn', device="cuda"):
+    def __init__(self, loss_type="bdcn", device="cuda"):
         super(TEEDLoss, self).__init__()
         self.device = device
         self.loss_type = loss_type
 
-        if loss_type == 'bdcn':
+        if loss_type == "bdcn":
             self.loss_fn = self.bdcn_loss
-        elif loss_type == 'cats':
+        elif loss_type == "cats":
             self.loss_fn = self.cats_loss
+        elif loss_type == "cosine":
+            self.loss_fn = self.cosine_edge_loss
 
     def __call__(self, inputs, targets, reg=1):
         return self.loss_fn(inputs, targets, reg)
+
+    def intersection_edge_loss(self, corr_edge, orig_edge):
+        orig_edge = orig_edge.view(orig_edge.shape[0], -1)
+        corr_edge = corr_edge.view(corr_edge.shape[0], -1)
+        cosine_similarity = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
+        loss = torch.mean(1.0 - cosine_similarity(corr_edge, orig_edge))
+        net_loss = torch.max(loss, torch.tensor(0.0).to(loss.device))
+        return net_loss
+
+    def cosine_edge_loss_per_channel(self, edge_corr, edge_orig):
+        h, w = edge_corr.shape[-2], edge_corr.shape[-1]
+        original_scale_loss = self.intersection_edge_loss(edge_corr, edge_orig)
+
+        net_loss = original_scale_loss
+        return net_loss
+
+    def cosine_edge_loss(self, corr_images, orig_images, reg=1):
+        # the reg is not used
+        net_loss = 0
+        corr_images = torch.sigmoid(corr_images)
+        for ch in range(corr_images.shape[1]):
+            net_loss += self.cosine_edge_loss_per_channel(
+                corr_images[:, ch : ch + 1, :, :], orig_images[:, ch : ch + 1, :, :]
+            )
+        net_loss /= corr_images.shape[1]
+        return net_loss
 
     def bdcn_loss_per_channel(self, inputs, targets, reg=1):
         # bdcn loss modified in DexiNed
@@ -36,7 +64,7 @@ class TEEDLoss:
         cost = torch.nn.BCELoss(mask, reduction="none")(inputs, targets.float())
         cost = torch.sum(cost.float().mean((1, 2, 3)))  # before sum
         return reg * cost
-    
+
     def bdrloss_per_channel(self, prediction, label, radius):
         """
         The boundary tracing loss that handles the confusing pixels.
@@ -47,9 +75,13 @@ class TEEDLoss:
         filt = filt.to(self.device)
 
         bdr_pred = prediction * label
-        pred_bdr_sum = label * F.conv2d(bdr_pred, filt, bias=None, stride=1, padding=radius)
+        pred_bdr_sum = label * F.conv2d(
+            bdr_pred, filt, bias=None, stride=1, padding=radius
+        )
 
-        texture_mask = F.conv2d(label.float(), filt, bias=None, stride=1, padding=radius)
+        texture_mask = F.conv2d(
+            label.float(), filt, bias=None, stride=1, padding=radius
+        )
         mask = (texture_mask != 0).float()
         mask[label == 1] = 0
         pred_texture_sum = F.conv2d(
@@ -63,7 +95,6 @@ class TEEDLoss:
         cost[label == 0] = 0
 
         return torch.sum(cost.float().mean((1, 2, 3)))
-
 
     def textureloss_per_channel(self, prediction, label, mask_radius):
         """
@@ -88,28 +119,35 @@ class TEEDLoss:
 
         return torch.sum(loss.float().mean((1, 2, 3)))
 
-
     def bdcn_loss(self, inputs, targets, reg=1):
         net_loss = 0
         for ch in range(inputs.shape[1]):
-            net_loss += self.bdcn_loss_per_channel(inputs[:, ch:ch + 1, :, :], targets[:, ch:ch + 1, :, :], reg)
+            net_loss += self.bdcn_loss_per_channel(
+                inputs[:, ch : ch + 1, :, :], targets[:, ch : ch + 1, :, :], reg
+            )
         net_loss /= inputs.shape[1]
         return net_loss
-    
+
     def textureloss(self, prediction, label, mask_radius):
         net_loss = 0
         for ch in range(prediction.shape[1]):
-            net_loss += self.textureloss_per_channel(prediction[:, ch:ch + 1, :, :], label[:, ch:ch + 1, :, :], mask_radius)
+            net_loss += self.textureloss_per_channel(
+                prediction[:, ch : ch + 1, :, :],
+                label[:, ch : ch + 1, :, :],
+                mask_radius,
+            )
         net_loss /= prediction.shape[1]
         return net_loss
 
     def bdrloss(self, prediction, label, radius):
         net_loss = 0
         for ch in range(prediction.shape[1]):
-            net_loss += self.bdrloss_per_channel(prediction[:, ch:ch + 1, :, :], label[:, ch:ch + 1, :, :], radius)
+            net_loss += self.bdrloss_per_channel(
+                prediction[:, ch : ch + 1, :, :], label[:, ch : ch + 1, :, :], radius
+            )
         net_loss /= prediction.shape[1]
         return net_loss
-    
+
     def cats_loss(self, prediction, label, reg=[1, 1]):
         tex_factor, bdr_factor = reg
         balanced_w = 1.1
@@ -129,11 +167,9 @@ class TEEDLoss:
         cost = torch.nn.functional.binary_cross_entropy(
             prediction.float(), label.float(), weight=mask, reduction="none"
         )
-        cost = torch.sum(cost.float().mean((1, 2, 3))) 
+        cost = torch.sum(cost.float().mean((1, 2, 3)))
         label_w = (label != 0).float()
-        textcost = self.textureloss(
-            prediction.float(), label_w.float(), mask_radius=4
-        )
+        textcost = self.textureloss(prediction.float(), label_w.float(), mask_radius=4)
         bdrcost = self.bdrloss(prediction.float(), label_w.float(), radius=4)
 
         return cost + bdr_factor * bdrcost + tex_factor * textcost

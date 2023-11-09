@@ -7,3 +7,6 @@
 - [ ] Clean up wandb pics so they all appear in one row and not multiple cells.
 - [ ] Might have to change architecture because currently pred combined doesn't have any useful information and its not learning either.Also may have to condition on the input image.? 
 - [ ] Add run name and save name functions.
+- [ ] Possibly some misunderstanding about the side outputs so need to check that. And add sigmoid or some fucntiont to losses to make sure they are between 0 and 1.
+- [ ] why is cosine loss working? Can we use this somehow for image reconstruction even tho its not a classification problem ?
+- [ ] Seems like higher learning rate is better for the model ? Retry all experiments with higher learning rate of 0.01 cause 0.1 seems too high.
