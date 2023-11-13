@@ -10,8 +10,8 @@ directory_names = dict(save_dir="/SCRATCH2/machiraj/EREN/")
 dataset_paths = dict(
     cifar10="/SCRATCH2/machiraj/datasets/cifar10/",
     cifar100="/SCRATCH2/machiraj/datasets/cifar100/",
-    imagenet_val="/datasets2/ImageNet2012/val/",
-    imagenet_train="/datasets2/ImageNet2012/train/",
+    imagenet_val="/datasets2/ImageNet2012/ILSVRC2012_validation/",
+    imagenet_train="/datasets2/ImageNet2012/ILSVRC2012_train/",
 )
 
 # directory where the respective models corresponding to the datasets are saved

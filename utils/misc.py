@@ -11,7 +11,7 @@ def run_name_generator(params):
 
 
 def save_path_generator(params, save_dir):
-    checkpoint_path = os.path.join(save_dir, params["run_name"])
+    checkpoint_path = os.path.join(save_dir, params["dataset"], params["edge_model"], params["run_name"])
     if not os.path.exists(checkpoint_path):
         os.makedirs(checkpoint_path)
     return checkpoint_path

@@ -109,7 +109,7 @@ class DataLoading:
         test_transform = transforms.Compose(
             [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),]
         )
-        train_transform = transforms.Compose([transforms.ToTensor(),])
+        train_transform = transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),])
         imagenet_path_val = configs.dataset_paths["imagenet_val"]
         imagenet_path = configs.dataset_paths["imagenet_train"]
 
@@ -119,7 +119,7 @@ class DataLoading:
         testloader = torch.utils.data.DataLoader(
             testset,
             batch_size=self.batch_size,
-            shuffle=self.shuffle,
+            shuffle=self.test_shuffle,
             pin_memory=True,
             num_workers=self.num_workers,
         )
@@ -127,9 +127,23 @@ class DataLoading:
         trainloader = torch.utils.data.DataLoader(
             trainset,
             batch_size=self.batch_size,
-            shuffle=self.shuffle,
+            shuffle=self.train_shuffle,
             pin_memory=True,
             num_workers=self.num_workers,
         )
         print("Loading data from {}".format(self.dataset_name.upper()))
         return trainset, trainloader, testset, testloader
+
+if __name__ == "__main__":
+    params = dict(dataset="imagenet", batch_size=128, num_workers=4)
+    data_loading = DataLoading(params=params)
+    trainset, trainloader, testset, testloader = data_loading.get_data()
+    print(len(trainset))
+    print(len(trainloader))
+    print(len(testset))
+    print(len(testloader))
+    for i, (x,y) in enumerate(trainloader):
+        print(x.shape)
+        print(y.shape)
+        exit()
+    print("done")

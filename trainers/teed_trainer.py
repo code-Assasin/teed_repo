@@ -20,11 +20,7 @@ from torch.utils.data import DataLoader
 
 sys.path.append("../")
 from utils.loss_util import *
-from utils.teed_model import TEED
-
-# from utils.img_processing import (image_normalization, save_image_batch_to_disk,
-#                    visualize_result, count_parameters)
-
+from models.teed_model import TEED
 
 class TEEDTrainer:
     def __init__(self, params, device="cuda"):
@@ -36,10 +32,8 @@ class TEEDTrainer:
         self.total_epochs = params["epochs"]
         self.trainloader = params["trainloader"]
         self.testloader = params["testloader"]
-
-        self.edge_operator = ko.filters.Sobel(normalized=True)
         self.net = TEED().to(device)
-
+        self.edge_operator = ko.filters.Sobel(normalized=True)
         self.optimizer = optim.Adam(
             self.net.parameters(), lr=params["lr"], weight_decay=params["weight_decay"]
         )
